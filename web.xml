@@ -1,0 +1,35 @@
+<web-app>
+
+    <filter>
+        <filter-name>CorsFilter</filter-name>
+        <filter-class>org.apache.catalina.filters.CorsFilter</filter-class>
+        <init-param>
+            <param-name>cors.allowed.origins</param-name>
+            <param-value>*</param-value>
+        </init-param>
+    </filter>
+    <filter-mapping>
+        <filter-name>CorsFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+    <servlet>
+        <servlet-name>FolderPermission</servlet-name>
+        <servlet-class>FolderPermission</servlet-class>
+    </servlet>
+
+    <servlet>
+        <servlet-name>UpdatePermissionDB</servlet-name>
+        <servlet-class>UpdatePermissionDB</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>FolderPermission</servlet-name>
+        <url-pattern>/folderperm</url-pattern>
+    </servlet-mapping>
+
+    <servlet-mapping>
+        <servlet-name>UpdatePermissionDB</servlet-name>
+        <url-pattern>/updateperm</url-pattern>
+    </servlet-mapping>
+</web-app>

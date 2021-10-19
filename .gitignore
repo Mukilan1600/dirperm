@@ -1,0 +1,7 @@
+*.exe
+*.class
+*.dll
+*.h
+*.o
+.idea
+.vscode
