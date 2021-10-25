@@ -1,0 +1,1 @@
+javac -h ./cpp-src/ ./permission/PermissionManager.java

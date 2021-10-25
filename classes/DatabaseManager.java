@@ -32,7 +32,7 @@ public class DatabaseManager {
     public static List<DirectoryPermissions> getDirectoryPermissions(List<String> directories){
         List<DirectoryPermissions> directoryPermissions = new ArrayList<>();
         String query = "SELECT object_name, sid_type, access_type, can_write, can_read, can_read_execute, can_delete, full_control FROM permissions p JOIN accessTypes a ON a.access_type_id=p.access_type_id JOIN sidTypes s ON s.sid_type_id=p.sid_type_id WHERE folder_name=?";
-        List<PermissionEntry> permissionEntries = new ArrayList<>();
+        List<PermissionEntry> permissionEntries;
         try(Connection conn = getConnection();PreparedStatement statement = conn.prepareStatement(query)){
             for(String directory: directories){
                 permissionEntries = new ArrayList<>();

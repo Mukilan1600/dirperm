@@ -56,7 +56,7 @@ public class PermissionEntry implements Serializable {
       }
 
       public PermissionEntry(String userName, String domainName, SIDType sidType, AccessType accessType, boolean write, boolean read, boolean readNExecute, boolean delete, boolean fullControl){
-            this.userName = domainName + "/" + userName;
+            this.userName = domainName + "\\" + userName;
             this.sidType = sidType;
             this.accessType = accessType;
             this.write = write;

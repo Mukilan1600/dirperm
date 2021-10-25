@@ -7,25 +7,12 @@ public class PermissionManager {
       }
 
       public static void main(String[] args){
-            getPermissions("D:\\apache-tomcat-8.5.71\\webapps\\dirperm\\WEB-INF\\classes\\asd");
+            setDirectoryPermissions("D:\\apache-tomcat-8.5.71\\webapps\\dirperm\\WEB-INF\\classes\\asd","MUKIL-PT4388\\temp", new PermissionEntry("MUKIL-PT4388/temp", PermissionEntry.SIDType.USER, PermissionEntry.AccessType.GRANT, true, true, false, false, false),new PermissionEntry("MUKIL-PT4388/temp", PermissionEntry.SIDType.USER, PermissionEntry.AccessType.DENY, true, false, false, false, false));
+//            List<DirectoryPermissions> dirs =  getDirectoryPermissionsAtDepth("D:\\apache-tomcat-8.5.71\\webapps\\dirperm\\WEB-INF\\classes\\asd", 2);
+//            for(DirectoryPermissions dir: dirs)
+//                  System.out.println(dir.getPermissionEntries().size());
       }
 
-      public static List<DirectoryPermissions> getPermissions(String folderName){
-            List<DirectoryPermissions> permissions = new ArrayList<>();
-            permissions.add(new DirectoryPermissions(folderName, 0));
-            permissions.addAll(getSubDirectories(folderName));
-            List<PermissionEntry> directoryPermissions;
-            for(DirectoryPermissions directory: permissions){
-                  directoryPermissions = getDirectoryPermissions(directory.folderName);
-                  if(directoryPermissions!=null)
-                        directory.setPermissionEntries(directoryPermissions);
-                  else
-                        directory.setPermissionEntries(new ArrayList<>());
-            }
-            return permissions;
-      }
-
-      public static native List<DirectoryPermissions> getSubDirectories(String folderName);
-      public static native List<PermissionEntry> getDirectoryPermissions(String fileName);
+      public static native List<DirectoryPermissions> getDirectoryPermissionsAtDepth(String folderName, int depth);
       public static native void setDirectoryPermissions(String fileName, String userName, PermissionEntry grantEntry, PermissionEntry denyEntry);
 }
