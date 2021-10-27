@@ -6,7 +6,13 @@
 #include "aclapi.h"
 #include "sddl.h"
 
-typedef std::basic_string<TCHAR> tstring;
+void _PrintLastError(DWORD dwErrorCode)
+{
+      LPSTR error_message = nullptr;
+      FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                     NULL, dwErrorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&error_message, 0, NULL);
+      _tprintf(TEXT("Error: %s\n"), error_message);
+}
 
 void _PrintLastError()
 {
@@ -25,12 +31,20 @@ jobject _getDirectoryPermissions(JNIEnv *env, jstring fileNameJ)
 
       PACL dacl;
       PSECURITY_DESCRIPTOR sd;
+      PINHERITED_FROM ifrom;
       SID *pSid = NULL;
       BOOL rtn = TRUE;
       DWORD dw_name = 0, dw_domain = 0;
       LPTSTR name = NULL, domain = NULL;
       SID_NAME_USE eUse = SidTypeUnknown;
       ACCESS_ALLOWED_ACE *ace;
+
+      GENERIC_MAPPING g_ObjMap = {
+          FILE_GENERIC_READ,
+          FILE_GENERIC_WRITE,
+          FILE_GENERIC_EXECUTE,
+          FILE_ALL_ACCESS};
+
       long mask;
 
       jclass cls_access_type = env->FindClass("permission/PermissionEntry$AccessType");
@@ -64,11 +78,30 @@ jobject _getDirectoryPermissions(JNIEnv *env, jstring fileNameJ)
             goto Cleanup;
       }
 
+      ifrom = (PINHERITED_FROM)LocalAlloc(LPTR, (1 + dacl->AceCount) * sizeof(INHERITED_FROM));
+      if (ifrom == NULL)
+      {
+            std::cout << "ifrom alloc" << std::endl;
+            _PrintLastError();
+            obj_list = NULL;
+            goto Cleanup;
+      }
+      std::cout << fileName << std::endl;
+      rtn = GetInheritanceSource((LPSTR)fileName, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, TRUE, NULL, 0, dacl, NULL, &g_ObjMap, ifrom);
+      if (rtn != ERROR_SUCCESS)
+      {
+            std::cout << rtn << std::endl;
+            _PrintLastError(rtn);
+            obj_list = NULL;
+            goto Cleanup;
+      }
+
       for (int i = 0; i < dacl->AceCount; i++)
       {
             dw_name = 0;
             dw_domain = 0;
             GetAce(dacl, i, (PVOID *)&ace);
+            std::cout << fileName << " " << ifrom[i].AncestorName << std::endl;
             if (ace->Header.AceFlags & INHERIT_ONLY_ACE)
                   continue;
             if (ace->Header.AceType == ACCESS_ALLOWED_ACE_TYPE)
@@ -134,14 +167,14 @@ jobject _getDirectoryPermissions(JNIEnv *env, jstring fileNameJ)
             env->CallBooleanMethod(obj_list, mtd_list_add, obj_permission_entry);
       }
 
-      Cleanup:
-            env->ReleaseStringUTFChars(fileNameJ, fileName);
-            if (name != NULL)
-                  GlobalFree(name);
-            if (domain != NULL)
-                  GlobalFree(domain);
-            if (sd != NULL)
-                  LocalFree(sd);
+Cleanup:
+      env->ReleaseStringUTFChars(fileNameJ, fileName);
+      if (name != NULL)
+            GlobalFree(name);
+      if (domain != NULL)
+            GlobalFree(domain);
+      if (sd != NULL)
+            LocalFree(sd);
 
       return obj_list;
 }
@@ -157,7 +190,7 @@ void _GetSubDirectoriesAtDepth(WIN32_FIND_DATA file, int depth, std::string file
             if (depth == 0)
             {
                   jobject permissions = _getDirectoryPermissions(env, newFileNameJ);
-                  if(permissions!=NULL)
+                  if (permissions != NULL)
                         env->CallBooleanMethod(obj_list, mtd_list_add, env->NewObject(cls_dir_perm, mtd_dir_perm_const, newFileNameJ, permissions));
             }
             else if (depth > 0)
@@ -221,7 +254,8 @@ long MakeAccessMask(JNIEnv *env, jclass cls_perm, jobject obj)
            is_write = GetBooleanObjectField(env, obj, cls_perm, "isWrite"),
            is_exec = GetBooleanObjectField(env, obj, cls_perm, "isReadNExecute"),
            is_delete = GetBooleanObjectField(env, obj, cls_perm, "isDelete"),
-           is_full_control = GetBooleanObjectField(env, obj, cls_perm, "isFullControl");;
+           is_full_control = GetBooleanObjectField(env, obj, cls_perm, "isFullControl");
+      ;
       long acc_mask = 0;
       if (is_exec)
       {
@@ -239,13 +273,14 @@ long MakeAccessMask(JNIEnv *env, jclass cls_perm, jobject obj)
       {
             acc_mask |= DELETE;
       }
-      if(is_full_control){
+      if (is_full_control)
+      {
             acc_mask |= FILE_ALL_ACCESS;
       }
       return acc_mask;
 }
 
-JNIEXPORT void JNICALL Java_permission_PermissionManager_setDirectoryPermissions(JNIEnv *env, jclass thisClass, jstring fileNameJ, jstring userNameJ, jobject obj_grant_entry, jobject obj_deny_entry)
+JNIEXPORT void JNICALL Java_permission_PermissionManager_setDirectoryPermissions(JNIEnv *env, jclass thisClass, jstring fileNameJ, jstring userNameJ, jobject obj_grant_entry, jobject obj_deny_entry, jboolean replace)
 {
 
       const char *fileName = env->GetStringUTFChars(fileNameJ, NULL), *userName = env->GetStringUTFChars(userNameJ, NULL);
@@ -270,7 +305,7 @@ JNIEXPORT void JNICALL Java_permission_PermissionManager_setDirectoryPermissions
       // jobject obj_acc_grant = env->GetStaticObjectField(cls_access_type, fld_access_type_grant);
       long grnt_acc_mask = MakeAccessMask(env, cls_perm_ent, obj_grant_entry), deny_acc_mask = MakeAccessMask(env, cls_perm_ent, obj_deny_entry);
 
-      BuildExplicitAccessWithName(&exp_access, (LPSTR)userName, grnt_acc_mask, SET_ACCESS, SUB_CONTAINERS_AND_OBJECTS_INHERIT);
+      BuildExplicitAccessWithName(&exp_access, (LPSTR)userName, grnt_acc_mask, replace ? SET_ACCESS : GRANT_ACCESS, SUB_CONTAINERS_AND_OBJECTS_INHERIT);
       rtn = SetEntriesInAcl(1, &exp_access, dacl, &nacl);
       if (rtn != ERROR_SUCCESS)
       {
@@ -285,18 +320,6 @@ JNIEXPORT void JNICALL Java_permission_PermissionManager_setDirectoryPermissions
             _PrintLastError();
             return;
       }
-
-      std::cout << "hello" << std::endl;
-      // if (deny_acc_mask > 0)
-      // {
-      //       BuildExplicitAccessWithName(&exp_access, (LPSTR)userName, deny_acc_mask, DENY_ACCESS, SUB_CONTAINERS_AND_OBJECTS_INHERIT);
-      //       rtn = SetEntriesInAcl(1, &exp_access, dacl, &nacl);
-      //       if (rtn != ERROR_SUCCESS)
-      //       {
-      //             _PrintLastError();
-      //             return;
-      //       }
-      // }
 
       rtn = SetNamedSecurityInfo((LPSTR)fileName, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, dacl, NULL);
       if (rtn != ERROR_SUCCESS)

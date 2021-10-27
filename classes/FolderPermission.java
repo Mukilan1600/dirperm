@@ -2,6 +2,7 @@ import java.sql.*;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.List;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javax.servlet.ServletException;
@@ -60,6 +61,7 @@ public class FolderPermission extends HttpServlet {
                     }
                 }
                 statement.executeBatch();
+                statement.clearBatch();
             }finally {
                 conn.commit();
                 conn.setAutoCommit(autoCommit);
@@ -71,6 +73,7 @@ public class FolderPermission extends HttpServlet {
         objectMapper.registerModule(new AfterburnerModule());
         out.print(objectMapper.writeValueAsString(directories));
         out.flush();
+        out.close();
     }
 
     @Override
@@ -89,7 +92,7 @@ public class FolderPermission extends HttpServlet {
             JSONObject reqObj = new JSONObject(reqStr.toString());
             PermissionEntry grantEntry = new PermissionEntry(reqObj.getJSONArray("entries").getJSONObject(0)),
                                 denyEntry =  new PermissionEntry(reqObj.getJSONArray("entries").getJSONObject(1));
-            PermissionManager.setDirectoryPermissions(reqObj.getString("folderName"),denyEntry.getUserName(),grantEntry,denyEntry);
+            PermissionManager.setDirectoryPermissions(reqObj.getString("folderName"),denyEntry.getUserName(),grantEntry,denyEntry, reqObj.getBoolean("replace"));
             out.write(reqObj.getString("folderName"));
             out.flush();
         }catch(JSONException e){
