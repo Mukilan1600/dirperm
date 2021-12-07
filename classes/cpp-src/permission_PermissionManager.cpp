@@ -28,10 +28,13 @@ void _PrintLastError()
 jobject _getDirectoryPermissions(JNIEnv *env, jstring fileNameJ)
 {
       const char *fileName = env->GetStringUTFChars(fileNameJ, NULL);
+      // wchar_t wtext[200];
+      // mbstowcs(wtext, fileName, strlen(fileName)+1);
+      // LPWSTR fileNameT = wtext;
 
       PACL dacl;
       PSECURITY_DESCRIPTOR sd;
-      PINHERITED_FROM ifrom;
+      PINHERITED_FROMW ifrom;
       SID *pSid = NULL;
       BOOL rtn = TRUE;
       DWORD dw_name = 0, dw_domain = 0;
@@ -73,12 +76,12 @@ jobject _getDirectoryPermissions(JNIEnv *env, jstring fileNameJ)
       rtn = GetNamedSecurityInfo((LPSTR)fileName, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, &dacl, NULL, &sd);
       if (rtn != ERROR_SUCCESS)
       {
-            std::cout << rtn << std::endl;
+            _PrintLastError();
             obj_list = NULL;
             goto Cleanup;
       }
 
-      ifrom = (PINHERITED_FROM)LocalAlloc(LPTR, (1 + dacl->AceCount) * sizeof(INHERITED_FROM));
+      ifrom = (PINHERITED_FROMW)LocalAlloc(LPTR, (1 + dacl->AceCount) * sizeof(INHERITED_FROM));
       if (ifrom == NULL)
       {
             std::cout << "ifrom alloc" << std::endl;
@@ -86,22 +89,23 @@ jobject _getDirectoryPermissions(JNIEnv *env, jstring fileNameJ)
             obj_list = NULL;
             goto Cleanup;
       }
-      std::cout << fileName << std::endl;
-      rtn = GetInheritanceSource((LPSTR)fileName, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, TRUE, NULL, 0, dacl, NULL, &g_ObjMap, ifrom);
-      if (rtn != ERROR_SUCCESS)
-      {
-            std::cout << rtn << std::endl;
-            _PrintLastError(rtn);
-            obj_list = NULL;
-            goto Cleanup;
-      }
+
+      // rtn = GetInheritanceSourceW(fileNameT, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, TRUE, NULL, 0, dacl, NULL, &g_ObjMap, ifrom);
+      // if (rtn != ERROR_SUCCESS)
+      // {
+      //       std::cout << rtn << std::endl;
+      //       _PrintLastError(rtn);
+      //       obj_list = NULL;
+      //       goto Cleanup;
+      // }
 
       for (int i = 0; i < dacl->AceCount; i++)
       {
             dw_name = 0;
             dw_domain = 0;
             GetAce(dacl, i, (PVOID *)&ace);
-            std::cout << fileName << " " << ifrom[i].AncestorName << std::endl;
+            // printf("%s %ls \n", fileName, ifrom[i].AncestorName);
+            // std::cout << fileName << " " << ifrom[i].AncestorName << std::endl;
             if (ace->Header.AceFlags & INHERIT_ONLY_ACE)
                   continue;
             if (ace->Header.AceType == ACCESS_ALLOWED_ACE_TYPE)
